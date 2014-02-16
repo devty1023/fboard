@@ -1,0 +1,8 @@
+like counter
+174499879257223/feed?fields=likes.limit(1).summary(true),message,comments
+
+comments 2:
+174499879257223/feed?fields=likes.limit(1),message,comments.limit(200)
+
+will this link be alive?
+https://fbcdn-profile-a.akamaihd.net/hprofile-ak-prn2/t5/1118447_1015636459_135956683_q.jpg
