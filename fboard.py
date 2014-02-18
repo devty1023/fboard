@@ -13,15 +13,17 @@
 """
 from flask import Flask, render_template
 from flask.ext.sqlalchemy import SQLAlchemy
-
-from celery import Celery
-
 import requests
 import json
 import time, calendar
 import math
 
 import redis
+
+
+
+
+from celery import Celery
 
 app = Flask(__name__)
 app.config.from_object('_config')

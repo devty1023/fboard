@@ -2,8 +2,6 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="">
         <meta name="author" content="">
 
@@ -11,9 +9,10 @@
 
         <!-- bootstrap css -->
         <link href="http://ckrack.github.io/fbootstrapp/bootstrap.css" rel="stylesheet">
-        <script src="js/bootstrap-dropdown.js"></script>
-        <script src="js/bootstrap-twipsy.js"></script>
-        <script src="js/bootstrap-scrollspy.js"></script>
+        <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+        <script src="{{ url_for('static', filename='js/bootstrap-dropdown.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/bootstrap-twipsy.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/bootstrap-scrollspy.js') }}"></script>
     
     </head>
    {% block body %}
