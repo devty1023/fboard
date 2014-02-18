@@ -1,3 +1,9 @@
+.*
 env/
 _*
 *.pyc
+celery*
+*.txt
+manage.py
+*.db
+RUN

@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+{% block body %}
+<style>
+body {
+  padding-top: 60px;
+}
+@media (max-width: 979px) {
+  body {
+    padding-top: 0px;
+  }
+}
+img {
+    position: absolute;
+}
+
+.post {
+    margin-bottom: 10px;
+}
+
+a.button {
+    text-decoration: none;
+}
+</style>
+<body>
+
+  <div class="container canvas">
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="container canvas">
+          <a class="brand" href="/">생활코딩</a>
+          <ul class="nav">
+            <li><a href="/about">About</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Example row of columns -->
+    <div>
+    {% for post in posts %}
+      <div class='row post'>
+        <div class='span1'>
+          <a href='http://facebook.com/{{post.author_id}}'>
+          <img src='https://graph.facebook.com/{{post.author_id}}/picture'>
+          </a>
+        </div>
+        <div class='span10 offset1'>
+          <div class='name'>
+            <a href='http://facebook.com/{{post.author_id}}'>
+            <b>{{ post.author }}</b>
+            </a>
+          </div>
+          <div class='message'>
+            {{ post.summary }}
+          </div>
+          <div class='extlink'>
+            {% if post.ext_link %}
+            <a class='button' href='{{ post.ext_link }}'>
+            <span class='label warning'> link </span>
+            </a>
+            {% endif %}
+          </div>
+          <div class='footer'>
+            <a class='button' href='{{ post.link}}'>
+            <span class='label notice'>{{ post.count_likes }} people likes this</span>
+            </a>
+            <a class='button' href='{{ post.link}}'>
+            <span class='label notice'>{{ post.count_comments }} comments</span>
+            </a>
+          </div>
+          <i>{{ post.created }}</i>
+        </div>
+      </div>
+    {% endfor %}
+    </div>
+ 
+  </div>
+</body>
+{%endblock%}

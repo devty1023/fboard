@@ -6,16 +6,36 @@ import time
 import datetime
 import calendar
 
+import manage
+
+@unittest.skip('skipping DBTest')
 class DBTest(unittest.TestCase):
     def setUp(self):
         self.db_fd, fboard.app.config['SQLALCHEMY_DATABASE'] \
                 = tempfile.mkstemp()
         fboard.db.create_all()
 
+    def test_update_or_create_post(self):
+        fboard.update_or_create_post(123, 'test', 1, 2, 'http://hello', 3, 5)
+        a = fboard.Post.query.filter_by().first()
+        print a
+        assert a
+
+        # update
+        fboard.update_or_create_post(123, 'test', 1, 2, 'http://hello', 5, 5)
+        b = fboard.Post.query.filter_by().first()
+        print b
+        assert b
+        
+        c = fboard.Post.query.filter_by().all()
+        print len(c)
+        assert len(c) is 1
+
     def tearDown(self):
         os.close(self.db_fd)
         os.unlink(fboard.app.config['SQLALCHEMY_DATABASE'])
 
+##@unittest.skip('skipping FBTest')
 class FBTest(unittest.TestCase):
     def setUp(self):
         self.fb = fboard.FBGroupFeed(fboard.app.config['GROUP_ID'],
@@ -35,6 +55,10 @@ class FBTest(unittest.TestCase):
         #print 'number of entries: ',len(feed)
         assert feed
 
+    def test_get_profile_pic(self):
+        r = self.fb.get_profile_link(100000141588086)
+        assert r.split('.')[-1] == 'jpg'
+
     def test_get_recent_feed(self):
         now = int(time.time())
         today = calendar.timegm(datetime.datetime(2014, 02, 15, 0, 0).timetuple())
@@ -50,6 +74,7 @@ class FBTest(unittest.TestCase):
 
         all_feed = self.fb.get_recent_feed(all_time, limit=10)
         #print "all feed: ", len(all_feed)
+        print all_feed
         assert all_feed
 
     def test_get_comments(self):
@@ -61,6 +86,30 @@ class FBTest(unittest.TestCase):
 
     def tearDown(self):
         pass
+
+@unittest.skip('skipping sync')
+class sync(unittest.TestCase):
+    def setUp(self):
+        self.db_fd, fboard.app.config['SQLALCHEMY_DATABASE'] \
+                = tempfile.mkstemp()
+        fboard.db.create_all()
+
+    def test_sync(self):
+        with fboard.app.app_context():
+            fboard.sync()
+
+    def test_multiple_sync(self):
+        num = 2
+        with fboard.app.app_context():
+            for i in xrange(num):
+                if i > 0:
+                    assert getattr(fboard.g, 'ref_time', 0) > 0
+                fboard.sync()
+
+    def tearDown(self):
+        os.close(self.db_fd)
+        os.unlink(fboard.app.config['SQLALCHEMY_DATABASE'])
+
 if __name__ == '__main__':
     unittest.main()
 

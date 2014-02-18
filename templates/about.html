@@ -1,0 +1,46 @@
+{% extends "layout.html" %}
+{% block body %}
+<style>
+body {
+  padding-top: 60px;
+}
+@media (max-width: 979px) {
+  body {
+    padding-top: 0px;
+  }
+}
+img {
+    position: absolute;
+}
+
+.post {
+    margin-bottom: 10px;
+}
+
+a.button {
+    text-decoration: none;
+}
+</style>
+<body>
+
+  <div class="container canvas">
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="container canvas">
+          <a class="brand" href="/">생활코딩</a>
+          <ul class="nav">
+            <li><a href="/about">About</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Example row of columns -->
+    <div class='hero-unit'>
+        made by <a href='https://github.com/devty1023'>devty</a>
+        <br>
+        source code here
+    </div>
+  </div>
+</body>
+{% endblock %}

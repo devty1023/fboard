@@ -11,16 +11,22 @@
     :copyright: (c) Copyright 2014 by devty
     :license: BSD, see LICENSE for detail
 """
-from flask import Flask
+from flask import Flask, render_template
 from flask.ext.sqlalchemy import SQLAlchemy
+
+from celery import Celery
 
 import requests
 import json
 import time, calendar
+import math
+
+import redis
 
 app = Flask(__name__)
 app.config.from_object('_config')
 db = SQLAlchemy(app)
+
 
 """
 DB
@@ -29,25 +35,36 @@ class Post(db.Model):
     """ 
     represnts a single post
     """
-    id = db.Column('post_id', db.Integer, 
-                    primary_key=True)
+    id = db.Column(db.String, primary_key=True)
+    created = db.Column(db.String)
     summary = db.Column(db.String(100))
-    content = db.Column(db.String)
     count_likes = db.Column(db.Integer)
     count_comments = db.Column(db.Integer)
-    score = db.Column(db.Integer)
-    hot = db.Column(db.Integer)
+    link = db.Column(db.String)
+    score = db.Column(db.Float)
+    hot = db.Column(db.Float)
+    author = db.Column(db.String)
+    author_id = db.Column(db.String)
+    ext_link = db.Column(db.String)
 
-    def __init__(self, id, summary, content, count_likes, 
-                 count_comments, score, hot):
+
+    def __init__(self, id, summary, count_likes, 
+                 count_comments, score, hot, link,
+                 author, author_id, created, ext_link):
         self.id = id
         self.summary = summary
-        self.content = content
         self.count_likes = count_likes
         self.count_comments = count_comments
+        self.link = link
         self.score = score
         self.hot = hot
+        self.author = author
+        self.author_id = author_id
+        self.created = created
+        self.ext_link = ext_link
 
+    def __repr__(self):
+        return '<POST> id: ' + str(self.id) + ' score: ' + str(self.score) 
 
 """
 FB
@@ -71,8 +88,8 @@ class FBGroupFeed(object):
     def get_feed(self, limit=500):
         payload = { 'access_token': self.access_token, 
                     'fields': """likes.summary(true),
-                                message,comments,from,
-                                type,picture,link,
+                                message,comments.summary(true),
+                                from,type,picture,link,
                                 created_time,actions""",
                     'limit': limit
                   }
@@ -108,17 +125,31 @@ class FBGroupFeed(object):
 
         return dict()
 
-    def get_recent_feed(self, ref_time, limit=500):
+    def get_recent_feed(self, ref_time, limit=5000):
+        print 'get_recent_feed(' + str(ref_time) + ')'
         feed = self.get_feed(limit=limit)
         recent_feed = []
 
+        print len(feed), " posts loaded"
         for post in feed:
             # post time since eposh
-            post_time = calendar.timegm(time.strptime(post['updated_time'], self.fb_time_format))
+            post_time = calendar.timegm(time.strptime(post['updated_time'], 
+                                                      self.fb_time_format)
+                                       )
+
             if post_time > ref_time:
                 recent_feed.append(post)
 
         return recent_feed
+
+    # dont use
+    def get_profile_link(self, author_id):
+        r =requests.request('GET', self.path_graph + \
+                                   str(author_id) + \
+                                   '/picture')
+
+        return r.url
+
 
     def get_comments(self, post_id, limit=5000):
         payload = { 'access_token': self.access_token, 
@@ -135,5 +166,145 @@ class FBGroupFeed(object):
             return json.loads(res.content)['comments']['data'] 
         else:
             return dict()
+
+
+"""
+Celery Tasks
+"""
+def make_celery(app):
+    celery = Celery(app.import_name, broker=app.config['CELERY_BROKER_URL'])
+    celery.conf.update(app.config)
+    TaskBase = celery.Task
+    class ContextTask(TaskBase):
+        abstract = True
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return TaskBase.__call__(self, *args, **kwargs)
+    celery.Task = ContextTask
+    return celery
+
+celery = make_celery(app)
+
+@celery.task()
+def update_score(post):
+    # calculate hotscore
+    post['score'], post['hot'] = hotness(post['count_likes'], 
+                                         post['count_comments'], 
+                                         post['ref_time'])
+
+    print 'updating score: ' + str(post)
+    # create / update database entry
+    return update_or_create_post(post['post_id'],
+                                 post['summary'], 
+                                 post['count_likes'],
+                                 post['count_comments'],
+                                 post['link'], 
+                                 post['score'],
+                                 post['hot'],
+                                 post['author'],
+                                 post['author_id'],
+                                 post['created'],
+                                 post['ext_link'])
+
+      
+
+@celery.task()
+def sync():
+    """Synchronize with database"""
+    fb = FBGroupFeed(group_id = app.config['GROUP_ID'],
+                     app_id = app.config['APP_ID'],
+                     app_secret = app.config['APP_SECRET'])
+
+    #GET REF_TIME FROM CACHE
+    r = redis.StrictRedis(host='localhost', port=6379, db=1)
+    ref_time = r.get('ref_time')
+    if not ref_time:
+        ref_time = app.config['SYNC_START']
+
+    ref_time = int(ref_time)
+
+    posts = fb.get_recent_feed(ref_time)
+
+    for post in posts:
+        clean_post = dict()
+        clean_post['post_id'] = post['id']
+        clean_post['summary'] = post.get('message', "")
+
+        temp_likes = post.get('likes', 0)
+        if not temp_likes:
+            clean_post['count_likes'] = 0 
+        else:
+            clean_post['count_likes'] = int(post['likes']['summary']['total_count'])
+
+        temp_comments = post.get('comments', 0)
+        if not temp_comments:
+            clean_post['count_comments'] = 0
+        else:
+            clean_post['count_comments'] = int(post['comments']['summary']['total_count'])
+
+        clean_post['link'] = post['actions'][0]['link']
+        clean_post['author'] = post['from']['name']
+        clean_post['author_id'] = post['from']['id']
+        clean_post['created'] = post['created_time']
+        clean_post['ext_link'] = post.get('link', '')
+        clean_post['ref_time'] = ref_time
+
+        update_score.delay(clean_post)
+        
+    # give processing time.... by 20?
+    r.set('ref_time', int(time.time())-20)
+
+"""
+utils
+"""
+def hotness(likes, comments, ref_time):
+    t = ref_time - 1319336955
+    score = likes + comments*0.3 # score is weighed much less
+    if score == 0:
+        return score, score
+    return score, math.log(score) + (score * t)/35000
+
+def update_or_create_post(post_id, summary, count_likes, 
+                          count_comments, link, score, hot,
+                          author, author_id, created, ext_link):
+    obj = Post.query.filter_by(id=post_id).first()
+    if obj:
+        # update
+        obj.count_likes = count_likes
+        obj.count_comments = count_comments
+        obj.score = score
+        obj.hot = hot
+        db.session.commit()
+        return True
+    else:
+        # create obj
+        obj = Post(id=post_id, summary=summary, count_likes=count_likes,
+                   count_comments=count_comments, link=link,
+                   score=score, hot=hot, author=author, author_id=author_id,
+                   created=created, ext_link=ext_link)
+
+        db.session.add(obj)
+        db.session.commit()
+        return True
+    
+
+
+"""
+FRONTEND
+"""
+@app.route('/')
+def index():
+    fb = FBGroupFeed(group_id = app.config['GROUP_ID'],
+                     app_id = app.config['APP_ID'],
+                     app_secret = app.config['APP_SECRET'])
+
+    top_20 = Post.query.order_by(Post.hot.desc()).limit(20)
+    return render_template("index.html", posts=top_20)
+
+@app.route('/about')
+def about():
+    return render_template('about.html')
+    
+
 
 
