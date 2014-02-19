@@ -6,14 +6,16 @@
     <div class="topbar">
       <div class="topbar-inner">
         <div class="container canvas">
-          <a class="brand" href="/">생활코딩</a>
+          <a class="brand" href="/">생코보드</a>
           <ul class="nav">
+            <li><a href="/">Trending</a></li>
+            <li><a href="/top">Top</a></li>
             <li><a href="/about">About</a></li>
           </ul>
         </div>
       </div>
     </div>
-    
+    <h2> {{ page_title }} </h2>
     <!-- Example row of columns -->
     <div>
     {% for post in posts %}
@@ -46,8 +48,6 @@
             <a class='button' href='{{ post.link}}'>
             <span class='label notice'>{{ post.count_comments }} comments</span>
             </a>
-            <span class='label num'>{{ post.hot }}</span>
-            <span class='label num'>{{ post.score }}</span>
           </div>
           <i>{{ post.created }}</i>
         </div>

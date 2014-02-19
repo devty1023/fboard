@@ -21,8 +21,6 @@ import math
 import redis
 
 
-
-
 from celery import Celery
 
 app = Flask(__name__)
@@ -193,7 +191,7 @@ def update_score(post):
     # calculate hotscore
     post['score'], post['hot'] = hotness(post['count_likes'], 
                                          post['count_comments'], 
-                                         post['ref_time'])
+                                         post['created'])
 
     #print 'updating score: ' + str(post)
     # create / update database entry
@@ -210,6 +208,82 @@ def update_score(post):
                                  ext_link=post['ext_link'])
 
       
+def sync_init():
+    """Synchronize with database-INIT"""
+    fb = FBGroupFeed(group_id = app.config['GROUP_ID'],
+                     app_id = app.config['APP_ID'],
+                     app_secret = app.config['APP_SECRET'])
+
+    ref_time = int(app.config['SYNC_START'])
+    posts = fb.get_feed()
+    for post in posts:
+        clean_post = dict()
+        clean_post['post_id'] = post['id']
+        clean_post['summary'] = post.get('message', "")
+
+        temp_likes = post.get('likes', 0)
+        if not temp_likes:
+            clean_post['count_likes'] = 0 
+        else:
+            clean_post['count_likes'] = int(post['likes']['summary']['total_count'])
+
+        temp_comments = post.get('comments', 0)
+        if not temp_comments:
+            clean_post['count_comments'] = 0
+        else:
+            clean_post['count_comments'] = int(post['comments']['summary']['total_count'])
+
+        clean_post['link'] = post['actions'][0]['link']
+        clean_post['author'] = post['from']['name']
+        clean_post['author_id'] = post['from']['id']
+        clean_post['created'] = calendar.timegm(time.strptime(post['created_time'], 
+                                                fb.fb_time_format)
+                                               )
+        print clean_post['created'], '!!!!!!!!!!!!'
+ 
+        clean_post['ext_link'] = post.get('link', '')
+        clean_post['ref_time'] = ref_time
+
+        update_score.delay(clean_post)
+
+    posts = fb.get_more_feed()
+    while posts:
+        print 'processing...', len(posts)
+        for post in posts:
+            clean_post = dict()
+            clean_post['post_id'] = post['id']
+            clean_post['summary'] = post.get('message', "")
+
+            temp_likes = post.get('likes', 0)
+            if not temp_likes:
+                clean_post['count_likes'] = 0 
+            else:
+                clean_post['count_likes'] = int(post['likes']['summary']['total_count'])
+
+            temp_comments = post.get('comments', 0)
+            if not temp_comments:
+                clean_post['count_comments'] = 0
+            else:
+                clean_post['count_comments'] = int(post['comments']['summary']['total_count'])
+
+            clean_post['link'] = post['actions'][0]['link']
+            clean_post['author'] = post['from']['name']
+            clean_post['author_id'] = post['from']['id']
+            clean_post['created'] = post['created_time']
+            clean_post['created'] = calendar.timegm(time.strptime(post['created_time'], 
+                                                    fb.fb_time_format)
+                                                   )
+            print clean_post['created'], '!!!!!!!!!!!!'
+ 
+
+            clean_post['ext_link'] = post.get('link', '')
+            clean_post['ref_time'] = ref_time
+
+            update_score.delay(clean_post)
+        posts = fb.get_more_feed()
+
+
+
 
 @celery.task()
 def sync():
@@ -248,7 +322,10 @@ def sync():
         clean_post['link'] = post['actions'][0]['link']
         clean_post['author'] = post['from']['name']
         clean_post['author_id'] = post['from']['id']
-        clean_post['created'] = post['created_time']
+        clean_post['created'] = calendar.timegm(time.strptime(post['created_time'], 
+                                                fb.fb_time_format)
+                                               )
+        print clean_post['created'], '!!!!!!!!!!!!'
         clean_post['ext_link'] = post.get('link', '')
         clean_post['ref_time'] = ref_time
 
@@ -260,8 +337,8 @@ def sync():
 """
 utils
 """
-def hotness(likes, comments, ref_time):
-    t = int(ref_time) - int(app.config['SYNC_START'])
+def hotness(likes, comments, created):
+    t = int(created) - int(app.config['SYNC_START'])
     score = likes + comments*0.3 # comment is weighed much less
     if score == 0:
         return score, math.log10(1) + (t)/45000
@@ -294,8 +371,6 @@ def update_or_create_post(post_id, summary, count_likes,
         db.session.add(obj)
         db.session.commit()
         return True
-    
-
 
 """
 FRONTEND
@@ -306,8 +381,17 @@ def index():
                      app_id = app.config['APP_ID'],
                      app_secret = app.config['APP_SECRET'])
 
-    top_50 = Post.query.order_by(Post.hot.desc()).limit(50)
-    return render_template("index.html", posts=top_50)
+    trend_20 = Post.query.order_by(Post.hot.desc()).limit(20)
+    return render_template("index.html", page_title='trending now', posts=trend_20)
+
+@app.route('/top')
+def top():
+    fb = FBGroupFeed(group_id = app.config['GROUP_ID'],
+                     app_id = app.config['APP_ID'],
+                     app_secret = app.config['APP_SECRET'])
+
+    top_50 = Post.query.order_by(Post.score.desc()).limit(50)
+    return render_template("index.html", page_title='top 50',posts=top_50)
 
 @app.route('/about')
 def about():
