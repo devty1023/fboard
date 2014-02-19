@@ -39,7 +39,7 @@ class Post(db.Model):
     """
     id = db.Column(db.String, primary_key=True)
     created = db.Column(db.String)
-    summary = db.Column(db.String(100))
+    summary = db.Column(db.String)
     count_likes = db.Column(db.Integer)
     count_comments = db.Column(db.Integer)
     link = db.Column(db.String)
@@ -142,6 +142,7 @@ class FBGroupFeed(object):
             if post_time > ref_time:
                 recent_feed.append(post)
 
+        print "got: ",len(recent_feed)
         return recent_feed
 
     # dont use
@@ -194,19 +195,19 @@ def update_score(post):
                                          post['count_comments'], 
                                          post['ref_time'])
 
-    print 'updating score: ' + str(post)
+    #print 'updating score: ' + str(post)
     # create / update database entry
-    return update_or_create_post(post['post_id'],
-                                 post['summary'], 
-                                 post['count_likes'],
-                                 post['count_comments'],
-                                 post['link'], 
-                                 post['score'],
-                                 post['hot'],
-                                 post['author'],
-                                 post['author_id'],
-                                 post['created'],
-                                 post['ext_link'])
+    return update_or_create_post(post_id=post['post_id'],
+                                 summary=post['summary'], 
+                                 count_likes=post['count_likes'],
+                                 count_comments=post['count_comments'],
+                                 link=post['link'], 
+                                 score=post['score'],
+                                 hot=post['hot'],
+                                 author=post['author'],
+                                 author_id=post['author_id'],
+                                 created=post['created'],
+                                 ext_link=post['ext_link'])
 
       
 
@@ -260,11 +261,13 @@ def sync():
 utils
 """
 def hotness(likes, comments, ref_time):
-    t = ref_time - 1319336955
-    score = likes + comments*0.3 # score is weighed much less
+    t = int(ref_time) - int(app.config['SYNC_START'])
+    score = likes + comments*0.3 # comment is weighed much less
     if score == 0:
-        return score, score
-    return score, math.log(score) + (score * t)/35000
+        return score, math.log10(1) + (t)/45000
+    print 'diff:' + str(t)
+    return score, math.log10(score) + (t)/45000
+
 
 def update_or_create_post(post_id, summary, count_likes, 
                           count_comments, link, score, hot,
@@ -275,7 +278,10 @@ def update_or_create_post(post_id, summary, count_likes,
         obj.count_likes = count_likes
         obj.count_comments = count_comments
         obj.score = score
+        obj.summary = summary
+        print hot
         obj.hot = hot
+        db.session.add(obj)
         db.session.commit()
         return True
     else:
@@ -300,8 +306,8 @@ def index():
                      app_id = app.config['APP_ID'],
                      app_secret = app.config['APP_SECRET'])
 
-    top_20 = Post.query.order_by(Post.hot.desc()).limit(20)
-    return render_template("index.html", posts=top_20)
+    top_50 = Post.query.order_by(Post.hot.desc()).limit(50)
+    return render_template("index.html", posts=top_50)
 
 @app.route('/about')
 def about():
