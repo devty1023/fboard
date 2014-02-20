@@ -13,7 +13,6 @@
 """
 from flask import Flask, render_template
 from flask.ext.sqlalchemy import SQLAlchemy
-from flask.ext.heroku import Heroku
 import requests
 import json
 import time, calendar
@@ -27,10 +26,6 @@ from celery import Celery
 app = Flask(__name__)
 app.config.from_object('_config')
 db = SQLAlchemy(app)
-
-if app.config['ENV'] == 'PROD':
-    heroku=Heroku(app)
-
 
 """
 DB
