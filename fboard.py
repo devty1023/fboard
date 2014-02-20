@@ -13,6 +13,7 @@
 """
 from flask import Flask, render_template
 from flask.ext.sqlalchemy import SQLAlchemy
+from flask.ext.heroku import Heroku
 import requests
 import json
 import time, calendar
@@ -26,6 +27,9 @@ from celery import Celery
 app = Flask(__name__)
 app.config.from_object('_config')
 db = SQLAlchemy(app)
+
+if app.config['ENV'] == 'PROD':
+    heroku=Heroku(app)
 
 
 """
@@ -392,6 +396,12 @@ def top():
 
     top_50 = Post.query.order_by(Post.score.desc()).limit(50)
     return render_template("index.html", page_title='top 50',posts=top_50)
+
+@app.route('/admin/' + app.config['SECRET'] + '/init')
+def init_db():
+    sync_init()
+    return 'hello world'
+    
 
 @app.route('/about')
 def about():
