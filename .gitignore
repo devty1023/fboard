@@ -2,7 +2,6 @@
 env/
 *.pyc
 celery*
-*.txt
 manage.py
 *.db
 RUN
