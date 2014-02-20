@@ -1,6 +1,5 @@
 .*
 env/
-_*
 *.pyc
 celery*
 *.txt
