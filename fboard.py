@@ -13,6 +13,7 @@
 """
 from flask import Flask, render_template
 from flask.ext.sqlalchemy import SQLAlchemy
+from flask.ext.heroku import Heroku
 import requests
 import json
 import time, calendar
@@ -26,6 +27,10 @@ from celery import Celery
 app = Flask(__name__)
 app.config.from_object('_config')
 db = SQLAlchemy(app)
+
+if app.config['ENV'] == 'PROD':
+    heroku=Heroku(app)
+
 
 """
 DB
@@ -120,11 +125,6 @@ class FBGroupFeed(object):
                 return res_json['data']
             else:
                 self.more_link = ''
-                return dict()
-
-        return dict()
-
-    def get_recent_feed(self, ref_time, limit=5000):
         print 'get_recent_feed(' + str(ref_time) + ')'
         feed = self.get_feed(limit=limit)
         recent_feed = []
@@ -280,6 +280,7 @@ def sync_init():
 
             update_score.delay(clean_post)
         posts = fb.get_more_feed()
+    db.session.commit()
 
 
 
@@ -358,7 +359,7 @@ def update_or_create_post(post_id, summary, count_likes,
         print hot
         obj.hot = hot
         db.session.add(obj)
-        db.session.commit()
+        db.session.flush()
         return True
     else:
         # create obj
@@ -368,7 +369,7 @@ def update_or_create_post(post_id, summary, count_likes,
                    created=created, ext_link=ext_link)
 
         db.session.add(obj)
-        db.session.commit()
+        db.session.flush()
         return True
 
 """
@@ -405,3 +406,8 @@ def about():
 
 
 
+"""
+    fboard
+    ~~~
+    
+    enhancing fb group. 
