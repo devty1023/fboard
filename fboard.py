@@ -215,37 +215,6 @@ def sync_init():
 
     ref_time = int(app.config['SYNC_START'])
     posts = fb.get_feed()
-    for post in posts:
-        clean_post = dict()
-        clean_post['post_id'] = post['id']
-        clean_post['summary'] = post.get('message', "")
-
-        temp_likes = post.get('likes', 0)
-        if not temp_likes:
-            clean_post['count_likes'] = 0 
-        else:
-            clean_post['count_likes'] = int(post['likes']['summary']['total_count'])
-
-        temp_comments = post.get('comments', 0)
-        if not temp_comments:
-            clean_post['count_comments'] = 0
-        else:
-            clean_post['count_comments'] = int(post['comments']['summary']['total_count'])
-
-        clean_post['link'] = post['actions'][0]['link']
-        clean_post['author'] = post['from']['name']
-        clean_post['author_id'] = post['from']['id']
-        clean_post['created'] = calendar.timegm(time.strptime(post['created_time'], 
-                                                fb.fb_time_format)
-                                               )
-        print clean_post['created'], '!!!!!!!!!!!!'
- 
-        clean_post['ext_link'] = post.get('link', '')
-        clean_post['ref_time'] = ref_time
-
-        update_score.delay(clean_post)
-
-    posts = fb.get_more_feed()
     while posts:
         print 'processing...', len(posts)
         for post in posts:
